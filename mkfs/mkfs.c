@@ -18,13 +18,15 @@
 #define NINODES 200
 
 // Disk layout:
-// [ boot block | sb block | log | inode blocks | free bit map | data blocks ]
+// [ boot block | sb block | inode blocks | free bit map | data blocks | log ]
 
 int nbitmap = FSSIZE/BPB + 1;
 int ninodeblocks = NINODES / IPB + 1;
 int nlog = LOGBLOCKS+1;   // Header followed by LOGBLOCKS data blocks.
-int nmeta;    // Number of meta blocks (boot, sb, nlog, inode, bitmap)
+int nmeta;    // Number of non-data blocks (boot, sb, inode, bitmap, log)
 int nblocks;  // Number of data blocks
+int firstdatablock;
+int logstartblk;
 
 int fsfd;
 struct superblock sb;
@@ -33,7 +35,7 @@ uint freeinode = 1;
 uint freeblock;
 
 
-void balloc(int);
+void balloc(int, int, int);
 void wsect(uint, void*);
 void winode(uint, struct dinode*);
 void rinode(uint inum, struct dinode *ip);
@@ -90,7 +92,8 @@ main(int argc, char *argv[])
     die(argv[1]);
 
   // 1 fs block = 1 disk sector
-  nmeta = 2 + nlog + ninodeblocks + nbitmap;
+  // The on-disk log is reserved at the end of the image.
+  nmeta = 2 + ninodeblocks + nbitmap + nlog;
   nblocks = FSSIZE - nmeta;
 
   sb.magic = FSMAGIC;
@@ -98,14 +101,16 @@ main(int argc, char *argv[])
   sb.nblocks = xint(nblocks);
   sb.ninodes = xint(NINODES);
   sb.nlog = xint(nlog);
-  sb.logstart = xint(2);
-  sb.inodestart = xint(2+nlog);
-  sb.bmapstart = xint(2+nlog+ninodeblocks);
+  sb.inodestart = xint(2);
+  sb.bmapstart = xint(2 + ninodeblocks);
+  sb.logstart = xint(FSSIZE - nlog);
 
-  printf("nmeta %d (boot, super, log blocks %u, inode blocks %u, bitmap blocks %u) blocks %d total %d\n",
-         nmeta, nlog, ninodeblocks, nbitmap, nblocks, FSSIZE);
+  printf("nmeta %d (boot, super, inode blocks %u, bitmap blocks %u, log blocks %u) blocks %d total %d\n",
+         nmeta, ninodeblocks, nbitmap, nlog, nblocks, FSSIZE);
 
-  freeblock = nmeta;     // the first free block that we can allocate
+  firstdatablock = 2 + ninodeblocks + nbitmap;
+  logstartblk = FSSIZE - nlog;
+  freeblock = firstdatablock;     // first allocatable data block
 
   for(i = 0; i < FSSIZE; i++)
     wsect(i, zeroes);
@@ -169,7 +174,7 @@ main(int argc, char *argv[])
   din.size = xint(off);
   winode(rootino, &din);
 
-  balloc(freeblock);
+  balloc(freeblock, logstartblk, nlog);
 
   exit(0);
 }
@@ -234,15 +239,21 @@ ialloc(ushort type)
 }
 
 void
-balloc(int used)
+balloc(int used, int logstart, int logblocks)
 {
   uchar buf[BSIZE];
   int i;
 
-  printf("balloc: first %d blocks have been allocated\n", used);
+  printf("balloc: first %d blocks and last %d log blocks have been allocated\n",
+         used, logblocks);
   assert(used < BPB);
+  assert(logstart + logblocks <= FSSIZE);
+  assert(logstart + logblocks <= BPB);
   bzero(buf, BSIZE);
   for(i = 0; i < used; i++){
+    buf[i/8] = buf[i/8] | (0x1 << (i%8));
+  }
+  for(i = logstart; i < logstart + logblocks; i++){
     buf[i/8] = buf[i/8] | (0x1 << (i%8));
   }
   printf("balloc: write bitmap block at sector %d\n", sb.bmapstart);
