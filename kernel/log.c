@@ -40,7 +40,6 @@ struct logheader {
 struct log {
   struct spinlock lock;
   int start;
-  int size;
   int outstanding; // how many FS sys calls are executing.
   int committing;  // in commit(), please wait.
   int dev;
@@ -59,10 +58,7 @@ initlog(int dev, struct superblock *sb)
 
   initlock(&log.lock, "log");
   log.start = sb->logstart;
-  log.size = sb->nlog;
   log.dev = dev;
-  if(log.size < 2 || log.size > LOGBLOCKS + 1)
-    panic("initlog: bad log size");
   recover_from_log();
 }
 
@@ -135,7 +131,7 @@ begin_op(void)
   while(1){
     if(log.committing){
       sleep(&log, &log.lock);
-    } else if(log.lh.n + (log.outstanding+1)*MAXOPBLOCKS > log.size - 1){
+    } else if(log.lh.n + (log.outstanding+1)*MAXOPBLOCKS > LOGBLOCKS){
       // this op might exhaust log space; wait for commit.
       sleep(&log, &log.lock);
     } else {
@@ -222,7 +218,7 @@ log_write(struct buf *b)
   int i;
 
   acquire(&log.lock);
-  if (log.lh.n >= log.size - 1)
+  if (log.lh.n >= LOGBLOCKS)
     panic("too big a transaction");
   if (log.outstanding < 1)
     panic("log_write outside of trans");
