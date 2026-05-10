@@ -48,6 +48,7 @@ fsinit(int dev) {
 }
 
 // Zero a block.
+//udpated to use bwrite() instead of log_write() since the block is being zeroed and not modified
 static void
 bzero(int dev, int bno)
 {
@@ -55,7 +56,7 @@ bzero(int dev, int bno)
 
   bp = bread(dev, bno);
   memset(bp->data, 0, BSIZE);
-  log_write(bp);
+  bwrite(bp);
   brelse(bp);
 }
 
@@ -546,7 +547,16 @@ writei(struct inode *ip, int user_src, uint64 src, uint off, uint n)
       brelse(bp);
       break;
     }
-    log_write(bp);
+
+    //This part was updated to write to the log if the file is a directory,
+    //and write directly to disk otherwise to improve performance of file writes.
+    if(ip->type == T_DIR) {
+        log_write(bp);
+    } 
+    // Standard files are User Data. Bypass the journal and write synchronously.
+    else {
+        bwrite(bp);
+    }
     brelse(bp);
   }
 
