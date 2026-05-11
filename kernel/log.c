@@ -35,6 +35,7 @@
 struct logheader {
   int n;
   int block[LOGBLOCKS];
+  uint checksum;
 };
 
 struct log {
@@ -49,6 +50,7 @@ struct log log;
 
 static void recover_from_log(void);
 static void commit();
+static uint calc_checksum(void);
 
 void
 initlog(int dev, struct superblock *sb)
@@ -94,6 +96,7 @@ read_head(void)
   for (i = 0; i < log.lh.n; i++) {
     log.lh.block[i] = lh->block[i];
   }
+  log.lh.checksum = lh->checksum;
   brelse(buf);
 }
 
@@ -110,6 +113,8 @@ write_head(void)
   for (i = 0; i < log.lh.n; i++) {
     hb->block[i] = log.lh.block[i];
   }
+  log.lh.checksum = calc_checksum();
+  hb->checksum = log.lh.checksum;
   bwrite(buf);
   brelse(buf);
 }
@@ -118,7 +123,11 @@ static void
 recover_from_log(void)
 {
   read_head();
-  install_trans(1); // if committed, copy from log to disk
+  if (log.lh.checksum != calc_checksum()) {
+    printf("Torn commit detected! Ignoring log.\n");
+  } else {
+    install_trans(1); // if committed, copy from log to disk
+  }
   log.lh.n = 0;
   write_head(); // clear the log
 }
@@ -189,6 +198,23 @@ write_log(void)
     brelse(from);
     brelse(to);
   }
+}
+
+static uint
+calc_checksum(void)
+{
+  uint total = 0;
+  int i, j;
+  struct buf *bp;
+
+  for (i = 0; i < log.lh.n; i++) {
+    bp = bread(log.dev, log.start + i + 1);
+    for (j = 0; j < BSIZE; j++) {
+      total += bp->data[j];
+    }
+    brelse(bp);
+  }
+  return total;
 }
 
 static void
