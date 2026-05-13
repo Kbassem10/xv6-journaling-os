@@ -553,7 +553,6 @@ writei(struct inode *ip, int user_src, uint64 src, uint off, uint n)
     if(ip->type == T_DIR) {
         log_write_meta(bp);
     } 
-    // Standard files are User Data. Bypass the journal and write synchronously.
     else {
         bwrite(bp);
     }
