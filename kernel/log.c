@@ -239,7 +239,7 @@ commit()
 //   log_write(bp)
 //   brelse(bp)
 void
-log_write(struct buf *b)
+log_write_meta(struct buf *b)
 {
   int i;
 
@@ -247,7 +247,7 @@ log_write(struct buf *b)
   if (log.lh.n >= LOGBLOCKS)
     panic("too big a transaction");
   if (log.outstanding < 1)
-    panic("log_write outside of trans");
+    panic("log_write_meta outside of trans");
 
   for (i = 0; i < log.lh.n; i++) {
     if (log.lh.block[i] == b->blockno)   // log absorption
