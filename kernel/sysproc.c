@@ -6,6 +6,11 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "vm.h"
+#include "stat.h"
+
+extern int total_commits;
+extern int data_blocks_bypassed;
+extern int torn_commits_prevented;
 
 uint64
 sys_exit(void)
@@ -105,3 +110,17 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+uint64
+sys_logstat(void)
+{
+  struct logstats stats;
+  stats.total_commits = total_commits;
+  stats.data_blocks_bypassed = data_blocks_bypassed;
+  stats.torn_commits_prevented = torn_commits_prevented;
+  
+  struct proc *p = myproc();
+  if(copyout(p->pagetable, p->trapframe->a0,
+            (char *)&stats, sizeof(stats))<0)
+     return -1;
+  return 0;
+ }

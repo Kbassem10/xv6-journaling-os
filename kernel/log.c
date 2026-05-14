@@ -6,7 +6,9 @@
 #include "sleeplock.h"
 #include "fs.h"
 #include "buf.h"
-
+uint total_commits = 0;
+uint data_blocks_bypassed = 0;
+uint torn_commits_prevented = 0;
 // Simple logging that allows concurrent FS system calls.
 //
 // A log transaction contains the updates of multiple FS system
@@ -46,7 +48,6 @@ struct log {
   struct logheader lh;
 };
 struct log log;
-
 static void recover_from_log(void);
 static void commit();
 
@@ -195,6 +196,7 @@ static void
 commit()
 {
   if (log.lh.n > 0) {
+    total_commits++;
     write_log();     // Write modified blocks from cache to log
     write_head();    // Write header to disk -- the real commit
     install_trans(0); // Now install writes to home locations

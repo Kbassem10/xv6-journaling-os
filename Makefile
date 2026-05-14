@@ -194,6 +194,7 @@ UPROGS=\
 	$U/_zombie\
 	$U/_logstress\
 	$U/_forphan\
+	$U/_logstat\
 	$U/_dorphan\
 
 
