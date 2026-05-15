@@ -150,7 +150,9 @@ filewrite(struct file *f, uint64 addr, int n)
     // the maximum log transaction size, including
     // i-node, indirect block, allocation blocks,
     // and 2 blocks of slop for non-aligned writes.
-    int max = ((MAXOPBLOCKS-1-1-2) / 2) * BSIZE;
+    // Because User Data bypasses the log via Ordered Mode, 
+    // we calculate max chunk size based on metadata generation, not data size.
+int max = 64 * 1024; // Increased to unlock speed
     int i = 0;
     while(i < n){
       int n1 = n - i;
@@ -165,7 +167,6 @@ filewrite(struct file *f, uint64 addr, int n)
       end_op();
 
       if(r != n1){
-        // error from writei
         break;
       }
       i += r;

@@ -62,7 +62,7 @@ void            kinit(void);
 
 // log.c
 void            initlog(int, struct superblock*);
-void            log_write(struct buf*);
+void            log_write_meta(struct buf*);
 void            begin_op(void);
 void            end_op(void);
 
