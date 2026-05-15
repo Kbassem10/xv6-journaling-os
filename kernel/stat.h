@@ -9,3 +9,8 @@ struct stat {
   short nlink; // Number of links to file
   uint64 size; // Size of file in bytes
 };
+struct logstats {
+  int total_commits;
+  int data_blocks_bypassed;
+  int torn_commits_prevented;
+ };
