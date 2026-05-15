@@ -21,6 +21,8 @@
 #include "buf.h"
 #include "file.h"
 
+uint log_bypassed_data = 0;
+
 #define min(a, b) ((a) < (b) ? (a) : (b))
 // there should be one superblock per disk device, but we run with
 // only one device
@@ -555,6 +557,7 @@ writei(struct inode *ip, int user_src, uint64 src, uint off, uint n)
     } 
     else {
         bwrite(bp);
+        log_bypassed_data++;
     }
     brelse(bp);
   }
