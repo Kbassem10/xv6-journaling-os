@@ -152,6 +152,8 @@ filewrite(struct file *f, uint64 addr, int n)
     // and 2 blocks of slop for non-aligned writes.
     // Because User Data bypasses the log via Ordered Mode, 
     // we calculate max chunk size based on metadata generation, not data size.
+//Old code was
+//   int max = (MAXOPBLOCKS-1-1-2) / 2 * BSIZE;
 int max = 64 * 1024; // Increased to unlock speed
     int i = 0;
     while(i < n){
