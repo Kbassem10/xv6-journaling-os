@@ -196,6 +196,8 @@ UPROGS=\
 	$U/_forphan\
 	$U/_logstat\
 	$U/_dorphan\
+	$U/_speedtest\
+	$U/_bigfile\
 
 
 
