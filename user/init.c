@@ -22,6 +22,11 @@ main(void)
   }
   dup(0);  // stdout
   dup(0);  // stderr
+  
+  if(fork() == 0){
+    logdaemon(); // Spawns the background kernel thread
+    exit(0);
+  }
 
   for(;;){
     printf("init: starting sh\n");

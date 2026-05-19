@@ -158,15 +158,14 @@ begin_op(void)
 void
 end_op(void)
 {
-  int do_commit = 0;
 
   acquire(&log.lock);
   log.outstanding -= 1;
   if(log.committing)
     panic("log.committing");
-  if(log.outstanding == 0){
-    do_commit = 1;
-    log.committing = 1;
+  if(log.outstanding == 0 && log.lh.n > 0){
+    // Signal the background daemon that a batch is ready, then return immediately.
+    wakeup(&log.committing);
   } else {
     // begin_op() may be waiting for log space,
     // and decrementing log.outstanding has decreased
@@ -175,15 +174,6 @@ end_op(void)
   }
   release(&log.lock);
 
-  if(do_commit){
-    // call commit w/o holding locks, since not allowed
-    // to sleep with locks.
-    commit();
-    acquire(&log.lock);
-    log.committing = 0;
-    wakeup(&log);
-    release(&log.lock);
-  }
 }
 
 // Copy modified blocks from cache to log.
@@ -264,3 +254,27 @@ log_write_meta(struct buf *b)
   release(&log.lock);
 }
 
+uint64
+sys_logdaemon(void)
+{
+  for(;;){
+    acquire(&log.lock); // Lock log to check if there are any transactions to commit
+    
+    while(log.lh.n == 0 || log.outstanding > 0 || log.committing){ // No transactions to commit, or a commit is already in progress, so wait.
+      sleep(&log.committing, &log.lock); // Sleep on log.committing to be woken up when a transaction is ready or a commit finishes
+    }
+    // Enter commit phase
+    log.committing = 1;
+    release(&log.lock); // Release log lock while performing the commit, allowing other threads to call begin_op() and end_op() without blocking on the log during the potentially slow commit phase.
+
+    // Perform slow, heavy physical disk writes on the background thread
+    commit();
+
+    acquire(&log.lock);
+    log.committing = 0;
+    // Wake up any threads blocked in begin_op waiting for log space
+    wakeup(&log); 
+    release(&log.lock);
+  }
+  return 0;
+}

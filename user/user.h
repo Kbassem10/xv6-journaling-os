@@ -31,6 +31,7 @@ struct logstat {
 };
 struct logstats;
 int logstat(struct logstats *);
+int logdaemon(void);
 // ulib.c
 int stat(const char*, struct stat*);
 char* strcpy(char*, const char*);
