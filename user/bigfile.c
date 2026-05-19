@@ -3,54 +3,55 @@
 #include "user/user.h"
 #include "kernel/fcntl.h"
 
-// 256 KB is the practical ceiling for a single xv6 file
-// (MAXFILE = NDIRECT + NINDIRECT = 268 blocks).
-#define BIG_SIZE       (256 * 1024) // 256 KB, the largest file size that fits under xv6's MAXFILE ceiling
-#define BUF_SIZE       (64 * 1024) // matches filewrite()'s 64 KB chunk
-#define VANILLA_CHUNK  (3 * 1024) // vanilla xv6: (MAXOPBLOCKS-4)/2 * BSIZE
+// Set chunk size to 1KB (matches xv6 block size)
+#define CHUNK_SIZE 1024
+// Set total size to 250KB (Safely under the vanilla 268KB limit)
+#define TOTAL_SIZE (250 * 1024)
 
-int
-main(int argc, char *argv[])
-{
-  static char buf[BUF_SIZE];   // buffer for writing to the file
-  int fd, i;
-  int iterations = BIG_SIZE / BUF_SIZE;
-  int start, end;
+int main(void) {
+    int fd;
+    int i;
+    uint start_time, end_time;
+    char buf[CHUNK_SIZE];
 
-  for (i = 0; i < BUF_SIZE; i++)
-    buf[i] = 'X';
+    // Fill the buffer with dummy 'X' characters
+    memset(buf, 'X', CHUNK_SIZE);
 
-  printf("bigfile: creating a %d-byte file using %d-byte writes\n",
-         BIG_SIZE, BUF_SIZE);
+    printf("Starting Vanilla xv6 Big File Test...\n");
+    printf("Target size: 250 KB (Writing in 1 KB chunks)\n\n");
 
-  unlink("big.dat");
-  fd = open("big.dat", O_CREATE | O_WRONLY);
-  if (fd < 0) {
-    printf("bigfile: open failed\n");
-    exit(1);
-  }
+    // Start the stopwatch
+    start_time = uptime();
 
-  start = uptime();
-
-  for (i = 0; i < iterations; i++) {
-    if (write(fd, buf, BUF_SIZE) != BUF_SIZE) {
-      printf("bigfile: write failed at iteration %d\n", i);
-      close(fd);
-      exit(1);
+    // Create the file
+    fd = open("bigtest.txt", O_CREATE | O_WRONLY);
+    if(fd < 0){
+        printf("Error: Could not create file.\n");
+        exit(1);
     }
-  }
 
-  end = uptime();
-  close(fd);
+    // Write the data chunk by chunk
+    for(i = 0; i < (TOTAL_SIZE / CHUNK_SIZE); i++){
+        if(write(fd, buf, CHUNK_SIZE) != CHUNK_SIZE){
+            printf("Error: Write failed at chunk %d\n", i);
+            close(fd);
+            exit(1);
+        }
+        
+        // Print progress so you can watch the system crawl
+        if ((i + 1) % 50 == 0) {
+            printf("Written %d KB...\n", (i + 1));
+        }
+    }
+    close(fd);
 
-  int vanilla = (BIG_SIZE + VANILLA_CHUNK - 1) / VANILLA_CHUNK;
+    // Stop the stopwatch
+    end_time = uptime();
 
-  printf("bigfile: %d KB written in %d ticks using %d KB chunks\n",
-         BIG_SIZE / 1024, end - start, BUF_SIZE / 1024);
-  printf("bigfile: only %d transactions needed (vanilla xv6 would need ~%d)\n",
-         iterations, vanilla);
+    // Print final results
+    printf("\n--- RESULTS ---\n");
+    printf("Total size written: %d KB\n", TOTAL_SIZE / 1024);
+    printf("Time taken: %d clock ticks\n", end_time - start_time);
 
-  printf("bigfile: throughput = %d KB/tick\n", (BIG_SIZE / 1024) / (end - start));
-
-  exit(0);
+    exit(0);
 }
