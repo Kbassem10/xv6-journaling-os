@@ -126,6 +126,7 @@ recover_from_log(void)
   read_head();
   if (log.lh.checksum != calc_checksum()) {
     printf("Torn commit detected! Ignoring log.\n");
+    torn_commits_prevented++;
   } else {
     install_trans(1); // if committed, copy from log to disk
   }
