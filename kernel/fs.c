@@ -64,10 +64,12 @@ bzero(int dev, int bno)
 
 // Blocks.
 
-// Allocate a zeroed disk block.
+// Allocate a disk block.
+// If zero != 0 the block is also zeroed on disk; data blocks pass
+// zero == 0 because writei() overwrites them itself.
 // returns 0 if out of disk space.
 static uint
-balloc(uint dev)
+balloc(uint dev, int zero)
 {
   int b, bi, m;
   struct buf *bp;
@@ -81,7 +83,8 @@ balloc(uint dev)
         bp->data[bi/8] |= m;  // Mark block in use.
         log_write_meta(bp);
         brelse(bp);
-        bzero(dev, b + bi);
+        if(zero)
+          bzero(dev, b + bi);
         return b + bi;
       }
     }
@@ -413,7 +416,7 @@ bmap(struct inode *ip, uint bn)
 
   if(bn < NDIRECT){
     if((addr = ip->addrs[bn]) == 0){
-      addr = balloc(ip->dev);
+      addr = balloc(ip->dev, 0);
       if(addr == 0)
         return 0;
       ip->addrs[bn] = addr;
@@ -425,7 +428,7 @@ bmap(struct inode *ip, uint bn)
   if(bn < NINDIRECT){
     // Load indirect block, allocating if necessary.
     if((addr = ip->addrs[NDIRECT]) == 0){
-      addr = balloc(ip->dev);
+      addr = balloc(ip->dev, 1);
       if(addr == 0)
         return 0;
       ip->addrs[NDIRECT] = addr;
@@ -433,7 +436,7 @@ bmap(struct inode *ip, uint bn)
     bp = bread(ip->dev, addr);
     a = (uint*)bp->data;
     if((addr = a[bn]) == 0){
-      addr = balloc(ip->dev);
+      addr = balloc(ip->dev, 0);
       if(addr){
         a[bn] = addr;
         log_write_meta(bp);
@@ -540,6 +543,12 @@ writei(struct inode *ip, int user_src, uint64 src, uint off, uint n)
   if(off + n > MAXFILE*BSIZE) //the maximum file size set by the xv6
     return -1;
 
+  // Blocks starting at or beyond origsize were just allocated by bmap
+  // and hold garbage on disk, since balloc no longer pre-zeroes data
+  // blocks. A partial write to such a block must zero the buffer first
+  // so the untouched bytes are zero rather than stale disk contents.
+  uint origsize = ip->size;
+
   //this loop iterates over the blocks that need to be written to,
   //and for each block, it calculates how many bytes to write to that block (m),
   //and then writes to it. It keeps track of the total bytes written in tot,
@@ -550,6 +559,8 @@ writei(struct inode *ip, int user_src, uint64 src, uint off, uint n)
       break;
     bp = bread(ip->dev, addr);
     m = min(n - tot, BSIZE - off%BSIZE);
+    if(m < BSIZE && off - (off % BSIZE) >= origsize)
+      memset(bp->data, 0, BSIZE);
     if(either_copyin(bp->data + (off % BSIZE), user_src, src, m) == -1) { //
       brelse(bp);
       break;
