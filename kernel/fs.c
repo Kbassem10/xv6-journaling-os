@@ -558,7 +558,7 @@ writei(struct inode *ip, int user_src, uint64 src, uint off, uint n)
     //This part was updated to write to the log if the file is a directory,
     //and write directly to disk otherwise to improve performance of file writes.
 
-    if(ip->type == T_DIR) { //let the log to handle directories because they are considered meta data
+    if(ip->type == T_DIR) { 
         log_write_meta(bp);
     }
     else {

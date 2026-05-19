@@ -258,21 +258,19 @@ uint64
 sys_logdaemon(void)
 {
   for(;;){
-    acquire(&log.lock); // Lock log to check if there are any transactions to commit
+    acquire(&log.lock);
     
-    while(log.lh.n == 0 || log.outstanding > 0 || log.committing){ // No transactions to commit, or a commit is already in progress, so wait.
-      sleep(&log.committing, &log.lock); // Sleep on log.committing to be woken up when a transaction is ready or a commit finishes
+    while(log.lh.n == 0 || log.outstanding > 0 || log.committing){
+      sleep(&log.committing, &log.lock); 
     }
     // Enter commit phase
     log.committing = 1;
-    release(&log.lock); // Release log lock while performing the commit, allowing other threads to call begin_op() and end_op() without blocking on the log during the potentially slow commit phase.
+    release(&log.lock); 
 
-    // Perform slow, heavy physical disk writes on the background thread
     commit();
 
     acquire(&log.lock);
     log.committing = 0;
-    // Wake up any threads blocked in begin_op waiting for log space
     wakeup(&log); 
     release(&log.lock);
   }
