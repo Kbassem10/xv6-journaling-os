@@ -4,8 +4,8 @@
 #include "kernel/fcntl.h"
 
 // 256 KB: largest size that fits under xv6's MAXFILE ceiling
-// (NDIRECT + NINDIRECT = 268 blocks). Do not raise past ~268 KB.
-#define FILE_SIZE  (256 * 1024)
+// (NDIRECT + NINDIRECT = 268 blocks).
+#define FILE_SIZE  (256 * 1024) // 256 KB, the largest file size that fits under xv6's MAXFILE ceiling
 #define CHUNK_SIZE 1024
 #define ITERATIONS (FILE_SIZE / CHUNK_SIZE)
 
